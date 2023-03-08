@@ -15,7 +15,11 @@ extern "C" {
 #include <stdio.h>
 #include "main.h"
 
+#define UART_RX_BUF_SIZE 4096
+
+
 void RetargetInit(UART_HandleTypeDef* huart);
+int rxDataReady();
 
 #ifdef __GNUC__
 #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)

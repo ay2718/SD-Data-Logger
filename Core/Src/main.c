@@ -46,14 +46,21 @@
 SPI_HandleTypeDef hspi1;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
+
+volatile int rx_half_cplt_flag = 0;
+volatile int rx_cplt_flag = 0;
+
+extern uint8_t uart_rx_buf[UART_RX_BUF_SIZE];
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
@@ -93,6 +100,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   MX_FATFS_Init();
@@ -102,84 +110,83 @@ int main(void)
 
   printf("\r\nSD Card Demo\r\n\r\n");
 
-  HAL_Delay(2000);
+  HAL_Delay(1000);
 
-  FATFS FatFs;
-  FIL fil;
-  FRESULT fres;
+//  fres = f_mount(&FatFs, "", 1);
+//  if (fres != FR_OK) {
+//	  printf("f_mount error (%i)\r\n", fres);
+//	  while(1);
+//  } else {
+//	  printf("Mounted successfully!\n\r");
+//  }
+//
+//  DWORD free_clusters, free_sectors, total_sectors;
 
-  fres = f_mount(&FatFs, "", 1);
-  if (fres != FR_OK) {
-	  printf("f_mount error (%i)\r\n", fres);
-	  while(1);
-  } else {
-	  printf("Mounted successfully!\n\r");
-  }
+//  FATFS* getFreeFs;
 
-  DWORD free_clusters, free_sectors, total_sectors;
-
-  FATFS* getFreeFs;
-
-  fres = f_getfree("", &free_clusters, &getFreeFs);
-  if (fres != FR_OK) {
-	  printf("g_getfree error (%i)\n\r", fres);
-	  while(1);
-  } else {
-	  printf("Getfree success!\n\r");
-  }
+//  fres = f_getfree("", &free_clusters, &getFreeFs);
+//  if (fres != FR_OK) {
+//	  printf("g_getfree error (%i)\n\r", fres);
+//	  while(1);
+//  } else {
+//	  printf("Getfree success!\n\r");
+//  }
 
   //Formula comes from ChaN's documentation
-  total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
-  free_sectors = free_clusters * getFreeFs->csize;
+//  total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
+//  free_sectors = free_clusters * getFreeFs->csize;
 
-  printf("SD card stats:\r\n%10lu KiB total drive space.\r\n%10lu KiB available.\r\n", total_sectors / 2, free_sectors / 2);
+//  printf("SD card stats:\r\n%10lu KiB total drive space.\r\n%10lu KiB available.\r\n", total_sectors / 2, free_sectors / 2);
 
 
-  fres = f_open(&fil, "test.txt", FA_READ);
-  if (fres != FR_OK) {
-	  printf("f_open error (%i)\r\n", fres);
-	  while(1);
-  }
-  printf("I was able to open 'test.txt' for reading!\r\n");
-
-  //Read 30 bytes from "test.txt" on the SD card
-  BYTE readBuf[30];
-
-  //We can either use f_read OR f_gets to get data out of files
-  //f_gets is a wrapper on f_read that does some string formatting for us
-  TCHAR* rres = f_gets((TCHAR*)readBuf, 30, &fil);
-  if(rres != 0) {
-	  printf("Read string from 'test.txt' contents: %s\r\n", readBuf);
-  } else {
-	  printf("f_gets error (%i)\r\n", fres);
-  }
-
-  //Be a tidy kiwi - don't forget to close your file!
-  f_close(&fil);
-
-  //Now let's try and write a file "write.txt"
-  fres = f_open(&fil, "write.txt", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
-  if(fres == FR_OK) {
-	  printf("I was able to open 'write.txt' for writing\r\n");
-  } else {
-	  printf("f_open error (%i)\r\n", fres);
-  }
-
-  //Copy in a string
-  strncpy((char*)readBuf, "a new file is made!", 19);
-  UINT bytesWrote;
-  fres = f_write(&fil, readBuf, 19, &bytesWrote);
-  if(fres == FR_OK) {
-	  printf("Wrote %i bytes to 'write.txt'!\r\n", bytesWrote);
-  } else {
-	  printf("f_write error (%i)\r\n", fres);
-  }
-
-  //Be a tidy kiwi - don't forget to close your file!
-  f_close(&fil);
-
-  //We're done, so de-mount the drive
-  f_mount(NULL, "", 0);
+//  fres = f_open(&fil, "test.txt", FA_READ);
+//  if (fres != FR_OK) {
+//	  printf("f_open error (%i)\r\n", fres);
+//	  while(1);
+//  }
+//  printf("I was able to open 'test.txt' for reading!\r\n");
+//
+//  //Read 30 bytes from "test.txt" on the SD card
+//  BYTE readBuf[30];
+//
+//  //We can either use f_read OR f_gets to get data out of files
+//  //f_gets is a wrapper on f_read that does some string formatting for us
+//  TCHAR* rres = f_gets((TCHAR*)readBuf, 30, &fil);
+//  if(rres != 0) {
+//	  printf("Read string from 'test.txt' contents: %s\r\n", readBuf);
+//  } else {
+//	  printf("f_gets error (%i)\r\n", fres);
+//  }
+//
+//  //Be a tidy kiwi - don't forget to close your file!
+//  f_close(&fil);
+//
+//  //Now let's try and write a file "write.txt"
+//  fres = f_open(&fil, "write.txt", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
+//  if(fres == FR_OK) {
+//	  printf("I was able to open 'write.txt' for writing\r\n");
+//  } else {
+//	  printf("f_open error (%i)\r\n", fres);
+//  }
+//
+//  //Copy in a string
+//  for (int i = 0; i < 30; i++) {
+//	  readBuf[i] = getchar();
+//  }
+////  strncpy((char*)readBuf, "a new file is made!", 19);
+//  UINT bytesWrote;
+//  fres = f_write(&fil, readBuf, 30, &bytesWrote);
+//  if(fres == FR_OK) {
+//	  printf("Wrote %i bytes to 'write.txt'!\r\n", bytesWrote);
+//  } else {
+//	  printf("f_write error (%i)\r\n", fres);
+//  }
+//
+//  //Be a tidy kiwi - don't forget to close your file!
+//  f_close(&fil);
+//
+//  //We're done, so de-mount the drive
+//  f_mount(NULL, "", 0);
 
   /* USER CODE END 2 */
 
@@ -190,6 +197,73 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+	  HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_SET);
+	  if (HAL_GPIO_ReadPin(CARD_DETECT_GPIO_Port, CARD_DETECT_Pin) == GPIO_PIN_SET) {
+		  printf("No card detected!\r\n");
+		  HAL_Delay(1000);
+		  continue;
+	  }
+	  HAL_Delay(1000);
+	  MX_FATFS_Init();
+	  FRESULT fres = f_mount(&USERFatFS, "", 1);
+	  if (fres != FR_OK) {
+		  printf("f_mount error (%i)\r\n", fres);
+		  f_mount(NULL, "", 0);
+		  MX_FATFS_DeInit();
+		  continue;
+	  }
+	  printf("Mounted Successfully!\r\n");
+
+	  char strprev[128];
+	  char returns[128];
+	  char date[128];
+	  char hours[10];
+	  char minutes[10];
+	  char seconds[10];
+
+	  scanf("%127[^\n\r]%127[\n\r ]%127[^\n\r,], %127[^\n\r,.:]:%127[^\n\r,.:]:%127[^\n\r,.:]", strprev, returns, date, hours, minutes, seconds);
+	  char fname[300];
+	  sprintf(fname, "%s--%s;%s;%s.csv", date, hours, minutes, seconds);
+
+	  printf("File name %s\n\r", fname);
+
+	  fres = f_open(&USERFile, fname, FA_CREATE_ALWAYS | FA_OPEN_ALWAYS | FA_WRITE);
+	  if (fres != FR_OK) {
+		  printf("f_open error (%i)\r\n", fres);
+		  f_close(&USERFile);
+		  f_mount(NULL, "", 0);
+		  MX_FATFS_DeInit();
+		  continue;
+	  }
+	  printf("Opened %s\r\n", fname);
+
+	  while(fres == FR_OK) {
+		  if (rx_cplt_flag && rx_half_cplt_flag) {
+			  rx_cplt_flag = 0;
+			  rx_half_cplt_flag = 0;
+		  }
+		  if (rx_half_cplt_flag) {
+			  rx_half_cplt_flag = 0;
+			  UINT bytesWrote;
+			  fres = f_write(&USERFile, uart_rx_buf, (UART_RX_BUF_SIZE >> 1), &bytesWrote);
+			  f_sync(&USERFile);
+			  printf("Wrote %i bytes (1/2)\r\n", bytesWrote);
+
+		  }
+		  if (rx_cplt_flag) {
+			  rx_cplt_flag = 0;
+			  UINT bytesWrote;
+			  fres = f_write(&USERFile, uart_rx_buf+(UART_RX_BUF_SIZE >> 1), (UART_RX_BUF_SIZE >> 1), &bytesWrote);
+			  f_sync(&USERFile);
+			  printf("Wrote %i bytes (2/2)\r\n", bytesWrote);
+		  }
+	  }
+
+	  printf("f_write error (%i)\r\n", fres);
+	  f_close(&USERFile);
+	  f_mount(NULL, "", 0);
+	  MX_FATFS_DeInit();
   }
   /* USER CODE END 3 */
 }
@@ -314,6 +388,22 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel2_3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -340,12 +430,24 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pins : CARD_DETECT_Pin WRITE_PROTECT_Pin */
   GPIO_InitStruct.Pin = CARD_DETECT_Pin|WRITE_PROTECT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == USART1) {
+		rx_half_cplt_flag = 1;
+	}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == USART1) {
+		rx_cplt_flag = 1;
+	}
+}
 
 /* USER CODE END 4 */
 
