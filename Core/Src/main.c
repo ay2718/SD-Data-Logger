@@ -108,7 +108,7 @@ int main(void)
 
   RetargetInit(&huart1);
 
-  printf("\r\nSD Card Demo\r\n\r\n");
+  printf("\nSD Card Demo\n\n");
 
   HAL_Delay(1000);
 
@@ -200,7 +200,7 @@ int main(void)
 
 	  HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_SET);
 	  if (HAL_GPIO_ReadPin(CARD_DETECT_GPIO_Port, CARD_DETECT_Pin) == GPIO_PIN_SET) {
-		  printf("No card detected!\r\n");
+		  printf("No card detected!\n");
 		  HAL_Delay(1000);
 		  continue;
 	  }
@@ -208,12 +208,12 @@ int main(void)
 	  MX_FATFS_Init();
 	  FRESULT fres = f_mount(&USERFatFS, "", 1);
 	  if (fres != FR_OK) {
-		  printf("f_mount error (%i)\r\n", fres);
+		  printf("f_mount error (%i)\n", fres);
 		  f_mount(NULL, "", 0);
 		  MX_FATFS_DeInit();
 		  continue;
 	  }
-	  printf("Mounted Successfully!\r\n");
+	  printf("Mounted Successfully!\n");
 
 	  char strprev[128];
 	  char returns[128];
@@ -226,17 +226,17 @@ int main(void)
 	  char fname[300];
 	  sprintf(fname, "%s--%s;%s;%s.csv", date, hours, minutes, seconds);
 
-	  printf("File name %s\n\r", fname);
+	  printf("File name %s\n", fname);
 
 	  fres = f_open(&USERFile, fname, FA_CREATE_ALWAYS | FA_OPEN_ALWAYS | FA_WRITE);
 	  if (fres != FR_OK) {
-		  printf("f_open error (%i)\r\n", fres);
+		  printf("f_open error (%i)\n", fres);
 		  f_close(&USERFile);
 		  f_mount(NULL, "", 0);
 		  MX_FATFS_DeInit();
 		  continue;
 	  }
-	  printf("Opened %s\r\n", fname);
+	  printf("Opened %s\n", fname);
 
 	  while(fres == FR_OK) {
 		  if (rx_cplt_flag && rx_half_cplt_flag) {
@@ -248,7 +248,15 @@ int main(void)
 			  UINT bytesWrote;
 			  fres = f_write(&USERFile, uart_rx_buf, (UART_RX_BUF_SIZE >> 1), &bytesWrote);
 			  f_sync(&USERFile);
-			  printf("Wrote %i bytes (1/2)\r\n", bytesWrote);
+
+			  FATFS* getFreeFs;
+			  DWORD free_clusters, free_sectors, total_sectors;
+			  f_getfree("", &free_clusters, &getFreeFs);
+			  total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
+			  free_sectors = free_clusters * getFreeFs->csize;
+
+			  printf("Wrote %i bytes 1/2 ", bytesWrote);
+			  printf("%5lu MiB / %5lu MiB\n", (total_sectors - free_sectors) / 2048, total_sectors / 2048);
 
 		  }
 		  if (rx_cplt_flag) {
@@ -256,11 +264,19 @@ int main(void)
 			  UINT bytesWrote;
 			  fres = f_write(&USERFile, uart_rx_buf+(UART_RX_BUF_SIZE >> 1), (UART_RX_BUF_SIZE >> 1), &bytesWrote);
 			  f_sync(&USERFile);
-			  printf("Wrote %i bytes (2/2)\r\n", bytesWrote);
+
+			  FATFS* getFreeFs;
+			  DWORD free_clusters, free_sectors, total_sectors;
+			  f_getfree("", &free_clusters, &getFreeFs);
+			  total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
+			  free_sectors = free_clusters * getFreeFs->csize;
+
+			  printf("Wrote %i bytes 2/2 ", bytesWrote);
+			  printf("%5lu MiB / %5lu MiB\n", (total_sectors - free_sectors) / 2048, total_sectors / 2048);
 		  }
 	  }
 
-	  printf("f_write error (%i)\r\n", fres);
+	  printf("f_write error (%i)\n", fres);
 	  f_close(&USERFile);
 	  f_mount(NULL, "", 0);
 	  MX_FATFS_DeInit();
