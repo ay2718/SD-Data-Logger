@@ -43,6 +43,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+IWDG_HandleTypeDef hiwdg;
+
 SPI_HandleTypeDef hspi1;
 
 UART_HandleTypeDef huart1;
@@ -63,6 +65,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -108,9 +111,11 @@ int main(void)
 
   RetargetInit(&huart1);
 
-  printf("\nSD Card Demo\n\n");
+//  printf("\nSD Card Demo\n\n");
 
   HAL_Delay(1000);
+  MX_IWDG_Init();
+
 
 //  fres = f_mount(&FatFs, "", 1);
 //  if (fres != FR_OK) {
@@ -197,14 +202,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
+	  HAL_IWDG_Refresh(&hiwdg);
 	  HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_SET);
 	  if (HAL_GPIO_ReadPin(CARD_DETECT_GPIO_Port, CARD_DETECT_Pin) == GPIO_PIN_SET) {
 		  printf("No card detected!\n");
 		  HAL_Delay(1000);
 		  continue;
 	  }
+	  HAL_IWDG_Refresh(&hiwdg);
 	  HAL_Delay(1000);
+	  printf("Mounting SD card...\n");
 	  MX_FATFS_Init();
 	  FRESULT fres = f_mount(&USERFatFS, "", 1);
 	  if (fres != FR_OK) {
@@ -213,20 +220,24 @@ int main(void)
 		  MX_FATFS_DeInit();
 		  continue;
 	  }
-	  printf("Mounted Successfully!\n");
+	  HAL_IWDG_Refresh(&hiwdg);
+//	  printf("Mounted Successfully!\n");
 
-	  char strprev[128];
-	  char returns[128];
-	  char date[128];
-	  char hours[10];
-	  char minutes[10];
-	  char seconds[10];
+	  static char date[64];
+	  static char hours[10];
+	  static char minutes[10];
+	  static char seconds[10];
+	  static char fname[128];
 
-	  scanf("%127[^\n\r]%127[\n\r ]%127[^\n\r,], %127[^\n\r,.:]:%127[^\n\r,.:]:%127[^\n\r,.:]", strprev, returns, date, hours, minutes, seconds);
-	  char fname[300];
+	  scanf("%*[^\n\r]%*[\n\r ]%63[^\n\r,], %9[^\n\r,.:]:%9[^\n\r,.:]:%9[^\n\r,.:]", date, hours, minutes, seconds);
+
 	  sprintf(fname, "%s--%s;%s;%s.csv", date, hours, minutes, seconds);
+//	  sprintf(fname, "foobar.csv");
 
-	  printf("File name %s\n", fname);
+	  HAL_IWDG_Refresh(&hiwdg);
+	  printf("Opening %s\n", fname);
+
+	  HAL_Delay(1000);
 
 	  fres = f_open(&USERFile, fname, FA_CREATE_ALWAYS | FA_OPEN_ALWAYS | FA_WRITE);
 	  if (fres != FR_OK) {
@@ -238,7 +249,9 @@ int main(void)
 	  }
 	  printf("Opened %s\n", fname);
 
+
 	  while(fres == FR_OK) {
+		  HAL_IWDG_Refresh(&hiwdg);
 		  if (rx_cplt_flag && rx_half_cplt_flag) {
 			  rx_cplt_flag = 0;
 			  rx_half_cplt_flag = 0;
@@ -256,7 +269,8 @@ int main(void)
 			  free_sectors = free_clusters * getFreeFs->csize;
 
 			  printf("Wrote %i bytes 1/2 ", bytesWrote);
-			  printf("%5lu MiB / %5lu MiB\n", (total_sectors - free_sectors) / 2048, total_sectors / 2048);
+			  printf("%6lu MB / %6lu MB", (total_sectors - free_sectors) / 2048, total_sectors / 2048);
+			  printf("%s\n", fname);
 
 		  }
 		  if (rx_cplt_flag) {
@@ -272,7 +286,8 @@ int main(void)
 			  free_sectors = free_clusters * getFreeFs->csize;
 
 			  printf("Wrote %i bytes 2/2 ", bytesWrote);
-			  printf("%5lu MiB / %5lu MiB\n", (total_sectors - free_sectors) / 2048, total_sectors / 2048);
+			  printf("%6lu MB / %6lu MB", (total_sectors - free_sectors) / 2048, total_sectors / 2048);
+			  printf("%s\n", fname);
 		  }
 	  }
 
@@ -297,8 +312,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL3;
@@ -326,6 +342,35 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief IWDG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_IWDG_Init(void)
+{
+
+  /* USER CODE BEGIN IWDG_Init 0 */
+
+  /* USER CODE END IWDG_Init 0 */
+
+  /* USER CODE BEGIN IWDG_Init 1 */
+
+  /* USER CODE END IWDG_Init 1 */
+  hiwdg.Instance = IWDG;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_64;
+  hiwdg.Init.Window = 4095;
+  hiwdg.Init.Reload = 4095;
+  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN IWDG_Init 2 */
+
+  /* USER CODE END IWDG_Init 2 */
+
 }
 
 /**

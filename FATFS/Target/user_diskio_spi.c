@@ -121,7 +121,7 @@ BYTE xchg_spi (
 )
 {
 	BYTE rxDat;
-    HAL_SPI_TransmitReceive(&SD_SPI_HANDLE, &dat, &rxDat, 1, 50);
+    HAL_SPI_TransmitReceive(&SD_SPI_HANDLE, &dat, &rxDat, 1, HAL_MAX_DELAY);
     return rxDat;
 }
 
